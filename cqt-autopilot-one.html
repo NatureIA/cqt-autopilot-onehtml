@@ -1,0 +1,897 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>CQT Autopilot One – MVP</title>
+<style>
+  :root{
+    --bg:#0b0f14; --card:#121821; --muted:#5b6b7d; --text:#eaf0f7; --accent:#4fc3f7; --good:#2ecc71; --bad:#ff6b6b; --warn:#f5a623;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:linear-gradient(180deg,#0b0f14 0%, #0a0d12 100%);color:var(--text);font-family:Inter,system-ui,Segoe UI,Roboto,Arial,sans-serif}
+  header{position:sticky;top:0;z-index:9;background:rgba(11,15,20,.9);backdrop-filter:blur(6px);border-bottom:1px solid #1e2632}
+  .wrap{max-width:1200px;margin:0 auto;padding:12px 16px}
+  h1{font-size:20px;margin:0;display:flex;align-items:center;gap:10px}
+  .grid{display:grid;gap:12px}
+  @media(min-width:900px){.grid{grid-template-columns:1.1fr .9fr}}
+  .card{background:var(--card);border:1px solid #1c2531;border-radius:16px;box-shadow:0 6px 20px rgba(0,0,0,.25)}
+  .card .hd{padding:14px 16px;border-bottom:1px solid #1c2531;font-weight:600}
+  .card .bd{padding:14px 16px}
+  .row{display:flex;gap:10px;flex-wrap:wrap}
+  .row > *{flex:1 1 160px}
+  label{display:block;font-size:12px;color:var(--muted);margin-bottom:6px}
+  input,select,button,textarea{
+    width:100%;padding:10px 12px;border-radius:12px;border:1px solid #263242;background:#0e141c;color:var(--text);
+    outline:none
+  }
+  input::placeholder{color:#7e8b9b}
+  button{cursor:pointer;font-weight:600}
+  .btn{background:#172333;border:1px solid #2a3a4f}
+  .btn:hover{filter:brightness(1.1)}
+  .btn-primary{background:linear-gradient(180deg,#22a6f2,#1477c9);border:1px solid #1e6fb8}
+  .btn-danger{background:linear-gradient(180deg,#ff6b6b,#d84343);border:1px solid #b93434}
+  .btn-good{background:linear-gradient(180deg,#2ecc71,#1fa65a);border:1px solid #158a49}
+  .switch{display:inline-flex;align-items:center;gap:10px}
+  .kpi{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+  .kpi .item{background:#0f1620;border:1px solid #1c2531;border-radius:14px;padding:12px}
+  .kpi .lbl{font-size:12px;color:var(--muted)}
+  .kpi .val{font-size:18px;margin-top:4px}
+  .pill{display:inline-block;padding:4px 10px;border-radius:999px;background:#0f1620;border:1px solid #243142;font-size:12px;color:#bcd0e6}
+  .flex{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+  .table{width:100%;border-collapse:collapse;font-size:12px}
+  .table th,.table td{border-bottom:1px solid #1c2531;padding:8px 6px;text-align:left}
+  .muted{color:var(--muted)}
+  .ok{color:var(--good)} .bad{color:var(--bad)} .warn{color:var(--warn)}
+  canvas{width:100%!important;height:360px!important}
+  .footnote{font-size:12px;color:#93a4b6}
+  .badge{padding:3px 8px;border-radius:999px;background:#132034;border:1px solid #24405a;font-size:11px}
+  .stack{display:grid;gap:12px}
+</style>
+</head>
+<body>
+<header>
+  <div class="wrap flex">
+    <h1>🧠 CQT Autopilot One <span class="pill">MVP Local</span></h1>
+    <div class="pill">Modo: <span id="modeLabel">Simulação</span></div>
+    <div class="pill">Estado: <span id="stateLabel">Parado</span></div>
+  </div>
+</header>
+
+<main class="wrap grid" id="app">
+  <!-- Coluna esquerda: Controle e Gráfico -->
+  <section class="stack">
+    <div class="card">
+      <div class="hd">Controles Rápidos</div>
+      <div class="bd">
+        <div class="row">
+          <div>
+            <label>Modo</label>
+            <select id="mode">
+              <option value="sim">Simulação (preço sintético)</option>
+              <option value="paper">Paper (sem ordens reais)</option>
+              <option value="real" disabled>Real (bloqueado para segurança)</option>
+            </select>
+          </div>
+          <div>
+            <label>Ativo (simulação)</label>
+            <select id="symbol">
+              <option value="BTCUSDT">BTCUSDT</option>
+              <option value="ETHUSDT">ETHUSDT</option>
+              <option value="SOLUSDT">SOLUSDT</option>
+            </select>
+          </div>
+          <div>
+            <label>Frame</label>
+            <select id="tf">
+              <option value="1m">1m</option>
+              <option value="5m" selected>5m</option>
+              <option value="15m">15m</option>
+            </select>
+          </div>
+          <div>
+            <label>Velocidade do Feed</label>
+            <select id="speed">
+              <option value="1">Lento</option>
+              <option value="2" selected>Médio</option>
+              <option value="4">Rápido</option>
+              <option value="8">Turbo</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="row" style="margin-top:8px">
+          <div class="switch">
+            <input type="checkbox" id="autoPilot" />
+            <label for="autoPilot"><strong>Autopilot ON/OFF</strong></label>
+          </div>
+          <button class="btn-danger" id="killSwitch">Kill-Switch</button>
+          <button class="btn" id="resetSim">Reset Simulação</button>
+          <button class="btn" id="exportCsv">Exportar Trades CSV</button>
+        </div>
+
+        <div class="kpi" style="margin-top:12px">
+          <div class="item">
+            <div class="lbl">Saldo (Paper)</div>
+            <div class="val" id="kpiBalance">$100,000.00</div>
+          </div>
+          <div class="item">
+            <div class="lbl">P&L Realizado</div>
+            <div class="val" id="kpiPnL">$0.00</div>
+          </div>
+          <div class="item">
+            <div class="lbl">Drawdown Diário</div>
+            <div class="val" id="kpiDD" class="warn">0.00%</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="hd">Gráfico</div>
+      <div class="bd">
+        <canvas id="chart"></canvas>
+        <div class="footnote">As marcações 🟢/🔴 representam entradas/saídas do Autopilot.</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="hd">Logs e Auditoria</div>
+      <div class="bd">
+        <table class="table" id="logTable">
+          <thead><tr><th>Hora</th><th>Tipo</th><th>Mensagem</th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <!-- Coluna direita: Configurações -->
+  <section class="stack">
+    <div class="card">
+      <div class="hd">Conexões (chaves ficam somente no seu aparelho)</div>
+      <div class="bd">
+        <div class="row">
+          <div>
+            <label>Exchange</label>
+            <select id="exch">
+              <option value="binance">Binance</option>
+              <option value="deriv">Deriv</option>
+              <option value="mt5">MetaTrader 5</option>
+            </select>
+          </div>
+          <div>
+            <label>API Key</label>
+            <input id="apiKey" placeholder="colar aqui (opcional p/ teste local)" />
+          </div>
+          <div>
+            <label>Secret</label>
+            <input id="apiSecret" placeholder="colar aqui (opcional p/ teste local)" />
+          </div>
+        </div>
+        <div class="row" style="margin-top:8px">
+          <button class="btn" id="saveConn">Salvar conexão local</button>
+          <span class="badge">As chaves NÃO saem do seu dispositivo.</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="hd">Risk Engine</div>
+      <div class="bd">
+        <div class="row">
+          <div><label>Risco por trade (%)</label><input type="number" id="riskPct" value="0.5" step="0.1" /></div>
+          <div><label>Stop (ATR múltiplo)</label><input type="number" id="stopAtr" value="2" step="0.1" /></div>
+          <div><label>Alvo (R múltiplo)</label><input type="number" id="targetR" value="2" step="0.1" /></div>
+        </div>
+        <div class="row" style="margin-top:8px">
+          <div><label>Fee (bps ida+volta)</label><input type="number" id="feeBps" value="8" step="1" /></div>
+          <div><label>Slippage (bps)</label><input type="number" id="slipBps" value="5" step="1" /></div>
+          <div><label>DD diário máx. (%)</label><input type="number" id="maxDailyDD" value="3" step="0.5" /></div>
+        </div>
+        <div class="row" style="margin-top:8px">
+          <div><label>Capital Paper ($)</label><input type="number" id="paperBalance" value="100000" step="100" /></div>
+          <div><label>Size mínimo ($)</label><input type="number" id="minNotional" value="10" step="1" /></div>
+          <div><label>Alavancagem (simulação)</label><input type="number" id="leverage" value="1" step="0.5" /></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="hd">Estratégias</div>
+      <div class="bd">
+        <div class="row">
+          <div>
+            <label class="switch">
+              <input type="checkbox" id="stDonchian" checked /> Donchian (tendência)
+            </label>
+            <div class="row">
+              <div><label>Período (alta/baixa)</label><input type="number" id="donLen" value="20" min="5" /></div>
+              <div><label>Filtro Vol (ATR min)</label><input type="number" id="donAtrMin" value="5" step="0.1" /></div>
+            </div>
+          </div>
+          <div>
+            <label class="switch">
+              <input type="checkbox" id="stBBrsi" checked /> Bollinger + RSI (reversão)
+            </label>
+            <div class="row">
+              <div><label>BB Período</label><input type="number" id="bbLen" value="20" min="5" /></div>
+              <div><label>BB DesvPad</label><input type="number" id="bbK" value="2" step="0.1" /></div>
+              <div><label>RSI Período</label><input type="number" id="rsiLen" value="14" min="5" /></div>
+              <div><label>RSI Zona</label><input type="number" id="rsiZone" value="30" step="1" /></div>
+            </div>
+          </div>
+        </div>
+        <div class="row" style="margin-top:8px">
+          <div>
+            <label>Allocator (peso dinâmico por performance 100 barras)</label>
+            <select id="allocator">
+              <option value="equal">Igualitário</option>
+              <option value="risk">Risk-parity (simples)</option>
+              <option value="momentum" selected>Momentum de estratégia</option>
+            </select>
+          </div>
+          <div>
+            <label>Coef. penalidade correlação</label>
+            <input type="number" id="corrPenalty" value="0.3" step="0.1" />
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="hd">Trades</div>
+      <div class="bd">
+        <table class="table" id="tradesTable">
+          <thead><tr><th>Hora</th><th>Lado</th><th>Preço</th><th>Qtd</th><th>SL</th><th>TP</th><th>PnL</th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </div>
+
+  </section>
+</main>
+
+<!-- Chart.js para visual -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+
+<script>
+/* =========================================================
+   CQT Autopilot One – MVP Local (Simulação + Paper)
+   - Preço sintético (GBM) com candles
+   - Donchian e BB+RSI
+   - Risk engine com stop/target, fees, slippage
+   - Circuit breaker por drawdown diário
+   - Autopilot (orquestrador+allocator)
+   - Logs, tabela de trades e export CSV
+   - Configuração persistente via LocalStorage
+   ========================================================= */
+
+const el = id => document.getElementById(id);
+const fmtUSD = v => (v<0?'-':'') + '$' + Math.abs(v).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2});
+const fmtPct = v => (v>=0?'+':'') + v.toFixed(2) + '%';
+const nowStr = () => new Date().toLocaleTimeString();
+
+const state = {
+  running:false,
+  kill:false,
+  mode:'sim',
+  tf:'5m',
+  speed:2,
+  symbol:'BTCUSDT',
+  balance:100000,
+  startOfDayBalance:100000,
+  dayStr: new Date().toDateString(),
+  equity:100000,
+  feeBps:8,
+  slipBps:5,
+  maxDailyDD:3,
+  riskPct:0.5,
+  stopAtr:2,
+  targetR:2,
+  minNotional:10,
+  leverage:1,
+  pos:null, // {side:'long'|'short', qty, entry, sl, tp, notional}
+  trades:[],
+  logs:[],
+  prices:[], // candles {t,o,h,l,c,v,atr,bbU,bbM,bbL,rsi,donH,donL}
+  don:{enabled:true,len:20,atrMin:5},
+  bbrsi:{enabled:true,bbLen:20,bbK:2,rsiLen:14,rsiZone:30},
+  allocator:'momentum',
+  corrPenalty:0.3,
+};
+
+function persist(){
+  const toSave = {
+    mode:el('mode').value,
+    symbol:el('symbol').value,
+    tf:el('tf').value,
+    speed:+el('speed').value,
+    riskPct:+el('riskPct').value,
+    stopAtr:+el('stopAtr').value,
+    targetR:+el('targetR').value,
+    feeBps:+el('feeBps').value,
+    slipBps:+el('slipBps').value,
+    maxDailyDD:+el('maxDailyDD').value,
+    paperBalance:+el('paperBalance').value,
+    minNotional:+el('minNotional').value,
+    leverage:+el('leverage').value,
+    donEnabled:el('stDonchian').checked,
+    donLen:+el('donLen').value,
+    donAtrMin:+el('donAtrMin').value,
+    bbrsiEnabled:el('stBBrsi').checked,
+    bbLen:+el('bbLen').value,
+    bbK:+el('bbK').value,
+    rsiLen:+el('rsiLen').value,
+    rsiZone:+el('rsiZone').value,
+    allocator:el('allocator').value,
+    corrPenalty:+el('corrPenalty').value,
+    exch:el('exch').value,
+  };
+  localStorage.setItem('cqt_autopilot_cfg', JSON.stringify(toSave));
+}
+function restore(){
+  const j = localStorage.getItem('cqt_autopilot_cfg');
+  if(!j) return;
+  try{
+    const c = JSON.parse(j);
+    for (const [k,v] of Object.entries(c)){
+      const ref = {
+        mode:'mode', symbol:'symbol', tf:'tf', speed:'speed', riskPct:'riskPct', stopAtr:'stopAtr',
+        targetR:'targetR', feeBps:'feeBps', slipBps:'slipBps', maxDailyDD:'maxDailyDD',
+        paperBalance:'paperBalance', minNotional:'minNotional', leverage:'leverage',
+        donEnabled:'stDonchian', donLen:'donLen', donAtrMin:'donAtrMin',
+        bbrsiEnabled:'stBBrsi', bbLen:'bbLen', bbK:'bbK', rsiLen:'rsiLen', rsiZone:'rsiZone',
+        allocator:'allocator', corrPenalty:'corrPenalty', exch:'exch'
+      }[k];
+      if(!ref) continue;
+      const node = el(ref);
+      if(node.type==='checkbox') node.checked = !!v;
+      else node.value = v;
+    }
+    // aplicar
+    state.mode = el('mode').value;
+    state.symbol = el('symbol').value;
+    state.tf = el('tf').value;
+    state.speed = +el('speed').value;
+    state.riskPct = +el('riskPct').value;
+    state.stopAtr = +el('stopAtr').value;
+    state.targetR = +el('targetR').value;
+    state.feeBps = +el('feeBps').value;
+    state.slipBps = +el('slipBps').value;
+    state.maxDailyDD = +el('maxDailyDD').value;
+    state.balance = +el('paperBalance').value;
+    state.startOfDayBalance = state.balance;
+    state.equity = state.balance;
+    state.minNotional = +el('minNotional').value;
+    state.leverage = +el('leverage').value;
+    state.don.enabled = el('stDonchian').checked;
+    state.don.len = +el('donLen').value;
+    state.don.atrMin = +el('donAtrMin').value;
+    state.bbrsi.enabled = el('stBBrsi').checked;
+    state.bbrsi.bbLen = +el('bbLen').value;
+    state.bbrsi.bbK = +el('bbK').value;
+    state.bbrsi.rsiLen = +el('rsiLen').value;
+    state.bbrsi.rsiZone = +el('rsiZone').value;
+    state.allocator = el('allocator').value;
+    state.corrPenalty = +el('corrPenalty').value;
+    uiSync();
+  }catch(e){}
+}
+
+function log(type,msg){
+  state.logs.unshift({t:new Date(), type, msg});
+  const tbody = el('logTable').querySelector('tbody');
+  const tr = document.createElement('tr');
+  tr.innerHTML = `<td>${nowStr()}</td><td>${type}</td><td class="muted">${msg}</td>`;
+  tbody.prepend(tr);
+  // limitar
+  while (tbody.rows.length>400) tbody.deleteRow(-1);
+}
+
+function uiSync(){
+  el('kpiBalance').textContent = fmtUSD(state.balance);
+  const realized = state.trades.reduce((a,t)=>a+(t.realized??0),0);
+  el('kpiPnL').textContent = fmtUSD(realized);
+  const dd = Math.max(0, (1 - (state.equity/state.startOfDayBalance))*100);
+  el('kpiDD').textContent = dd.toFixed(2)+'%';
+  el('modeLabel').textContent = state.mode==='sim'?'Simulação':(state.mode==='paper'?'Paper':'Real');
+  el('stateLabel').textContent = state.running? 'Rodando' : (state.kill?'KILLED':'Parado');
+}
+
+// ====== Simulador de preços (GBM + ruído intrabar) ======
+let tickTimer = null;
+function resetSimulation(){
+  state.prices = [];
+  state.trades = [];
+  state.pos = null;
+  el('tradesTable').querySelector('tbody').innerHTML = '';
+  el('logTable').querySelector('tbody').innerHTML = '';
+  state.dayStr = new Date().toDateString();
+  state.startOfDayBalance = state.balance;
+  state.equity = state.balance;
+  chartReset();
+  seedHistory();
+  log('info','Simulação resetada');
+  uiSync();
+}
+
+function seedHistory(){
+  // gerar 300 candles iniciais
+  const base = 50000; // preço base BTC
+  let p = base * (0.8 + Math.random()*0.4);
+  let v = 100;
+  const tfMin = {'1m':1,'5m':5,'15m':15}[state.tf]||5;
+  const atrLen = 14;
+  const closes=[];
+  for (let i=0;i<300;i++){
+    const mu = 0.0002;
+    const sigma = 0.01;
+    const ret = (mu - 0.5*sigma*sigma) + sigma*(Math.random()*2-1);
+    const c = Math.max(100, p * Math.exp(ret));
+    const range = c * (0.002 + Math.random()*0.006);
+    const o = p;
+    const h = Math.max(c,o)+range*Math.random();
+    const l = Math.min(c,o)-range*Math.random();
+    const t = Date.now() - (300-i)*tfMin*60*1000;
+    p = c; v = 80 + Math.random()*40;
+    closes.push(c);
+    const atr = calcATRForSeed(i, closes, atrLen);
+    const {bbU,bbM,bbL} = calcBB(closes, 20, 2);
+    const rsi = calcRSI(closes, 14);
+    const {donH,donL} = calcDon(chCloses(closes, 20));
+    state.prices.push({t,o,h,l,c,v,atr,bbU,bbM,bbL,rsi,donH,donL});
+  }
+  chartUpdateAll();
+}
+
+function calcATRForSeed(i, closes, len){
+  if (i===0) return 0;
+  const c = closes[i], pc = closes[i-1];
+  const tr = Math.abs(c - pc);
+  const start = Math.max(0, closes.length-len);
+  const arr = closes.slice(start);
+  const avg = arr.reduce((a,b)=>a+Math.abs(b - (arr[0]||b)),0)/(arr.length||1);
+  return avg/(arr[0]||1)*100; // ATR em %
+}
+
+function chCloses(closes, len){
+  // retorna array com últimos len valores (ou menos)
+  const n = closes.length;
+  const m = Math.max(0,n-len);
+  return closes.slice(m);
+}
+function sma(arr,len){
+  if (arr.length<len) return null;
+  const sub = arr.slice(arr.length-len);
+  return sub.reduce((a,b)=>a+b,0)/len;
+}
+function stddev(arr,len){
+  if (arr.length<len) return null;
+  const sub = arr.slice(arr.length-len);
+  const mean = sma(arr,len);
+  const v = sub.reduce((a,b)=>a+(b-mean)*(b-mean),0)/len;
+  return Math.sqrt(v);
+}
+function calcBB(closes,len,k){
+  const m = sma(closes,len);
+  if (m===null) return {bbU:null,bbM:null,bbL:null};
+  const sd = stddev(closes,len);
+  return {bbU:m+k*sd, bbM:m, bbL:m-k*sd};
+}
+function calcRSI(closes,len){
+  if (closes.length<len+1) return null;
+  let gains=0, losses=0;
+  for (let i=closes.length-len;i<closes.length;i++){
+    const d = closes[i]-closes[i-1];
+    if (d>=0) gains += d; else losses -= d;
+  }
+  const rs = gains/(losses||1e-9);
+  const rsi = 100 - 100/(1+rs);
+  return rsi;
+}
+function calcDon(closes){
+  if (closes.length<2) return {donH:null,donL:null};
+  const donH = Math.max(...closes);
+  const donL = Math.min(...closes);
+  return {donH,donL};
+}
+
+// Tick synthetic: agrega em candles e computa indicadores
+function nextCandle(){
+  const last = state.prices.at(-1);
+  const tfMin = {'1m':1,'5m':5,'15m':15}[state.tf]||5;
+  const mu = 0.0002, sigma = 0.01;
+  const ret = (mu - 0.5*sigma*sigma) + sigma*(Math.random()*2-1);
+  let c = Math.max(10, last.c * Math.exp(ret));
+  const range = last.c * (0.002 + Math.random()*0.006);
+  const o = last.c;
+  const h = Math.max(c,o)+range*Math.random();
+  const l = Math.min(c,o)-range*Math.random();
+  const t = (last.t + tfMin*60*1000);
+  const v = 80+Math.random()*40;
+
+  const closes = state.prices.map(p=>p.c).concat([c]);
+  const atr = atrPct(closes, 14);
+  const {bbU,bbM,bbL} = calcBB(closes, state.bbrsi.bbLen, state.bbrsi.bbK);
+  const rsi = calcRSI(closes, state.bbrsi.rsiLen);
+  const {donH,donL} = calcDon(closes.slice(-state.don.len));
+  const candle = {t,o,h,l,c,v,atr,bbU,bbM,bbL,rsi,donH,donL};
+  state.prices.push(candle);
+  if (state.prices.length>1200) state.prices.shift();
+
+  // dia novo => reseta diária
+  const dayNow = new Date(t).toDateString();
+  if (dayNow !== state.dayStr){
+    state.dayStr = dayNow;
+    state.startOfDayBalance = state.balance;
+    log('info','Novo dia: reset de base p/ drawdown diário');
+  }
+
+  chartPush(candle);
+  strategyLoop(candle);
+}
+function atrPct(closes,len){
+  if (closes.length<len+1) return 0;
+  let trs=[];
+  for (let i=1;i<closes.length;i++){
+    trs.push(Math.abs(closes[i]-closes[i-1]));
+  }
+  const sub = trs.slice(-len);
+  const avg = sub.reduce((a,b)=>a+b,0)/Math.max(1,sub.length);
+  const ref = closes.at(-1);
+  return (avg/ref)*100;
+}
+
+// ====== Estratégias & Orquestrador ======
+function strategyLoop(c){
+  // Circuit breaker: DD diário
+  const dd = Math.max(0,(1 - (state.equity/state.startOfDayBalance))*100);
+  if (dd >= state.maxDailyDD){
+    if (state.pos) closePosition('stop', c.c, 'Circuit Breaker DD diário');
+    state.running=false;
+    el('autoPilot').checked=false;
+    log('warn',`Circuit breaker acionado: DD ${dd.toFixed(2)}% >= ${state.maxDailyDD}%`);
+    uiSync();
+    return;
+  }
+
+  // Atualiza SL/TP se pos aberta
+  if (state.pos){
+    // stop/target atingidos?
+    if (state.pos.side==='long'){
+      if (c.l <= state.pos.sl) return closePosition('stop', state.pos.sl, 'Stop atingido (long)');
+      if (c.h >= state.pos.tp) return closePosition('target', state.pos.tp, 'Target atingido (long)');
+    }else{
+      if (c.h >= state.pos.sl) return closePosition('stop', state.pos.sl, 'Stop atingido (short)');
+      if (c.l <= state.pos.tp) return closePosition('target', state.pos.tp, 'Target atingido (short)');
+    }
+  }
+
+  if (!state.running) return;
+
+  // Sinais das estratégias ativas
+  const signals = [];
+  if (state.don.enabled){
+    const s = sigDonchian(c);
+    if (s) signals.push({name:'Donchian', ...s});
+  }
+  if (state.bbrsi.enabled){
+    const s = sigBBrsi(c);
+    if (s) signals.push({name:'BB+RSI', ...s});
+  }
+
+  if (signals.length===0) return;
+
+  // Allocator: decide direção final
+  const final = allocate(signals);
+  if (!final) return;
+
+  // Se já existe posição no mesmo lado, ignore
+  if (state.pos && state.pos.side===final.side) return;
+
+  // Se existe posição contrária, fecha antes de abrir nova
+  if (state.pos && state.pos.side!==final.side){
+    closePosition('flip', c.c, `Flip ${state.pos.side} -> ${final.side} (${final.name})`);
+  }
+
+  openPosition(final.side, c);
+}
+
+function sigDonchian(c){
+  // Regras: breakout acima de donH => long; abaixo de donL => short; filtro ATR mínimo
+  if (c.donH==null || c.donL==null) return null;
+  if (c.atr < state.don.atrMin) return null;
+  if (c.c > c.donH) return {dir:+1, side:'long', name:'Donchian'};
+  if (c.c < c.donL) return {dir:-1, side:'short', name:'Donchian'};
+  return null;
+}
+
+function sigBBrsi(c){
+  // Regras: preço tocando banda inferior + RSI<zona => long; banda superior + RSI>(100-zona) => short
+  if (c.bbU==null || c.bbL==null || c.rsi==null) return null;
+  const z = state.bbrsi.rsiZone;
+  if (c.c <= c.bbL && c.rsi <= z) return {dir:+1, side:'long', name:'BB+RSI'};
+  if (c.c >= c.bbU && c.rsi >= (100-z)) return {dir:-1, side:'short', name:'BB+RSI'};
+  return null;
+}
+
+function allocate(signals){
+  // Estratégia: momentum simples por última janela (100 barras)
+  // Aqui simulamos pesos iguais/momentum/correlação (MVP)
+  if (signals.length===1) return signals[0];
+
+  let pick = signals[0];
+  if (state.allocator==='equal'){
+    pick = signals[0]; // primeira que sinalizou
+  } else if (state.allocator==='risk'){
+    // Heurística: preferir sinal cuja estratégia historicamente teve menor vol (dummy MVP)
+    // Para MVP, apenas alterna determinístico:
+    pick = signals.sort((a,b)=>a.name.localeCompare(b.name))[0];
+  } else {
+    // momentum: preferir Donchian em regime vol alto, BB+RSI em vol baixo
+    pick = (signals.find(s=>s.name==='Donchian') && (state.prices.at(-1).atr>=state.don.atrMin))
+      ? signals.find(s=>s.name==='Donchian') : signals.find(s=>s.name==='BB+RSI') || signals[0];
+  }
+  return pick;
+}
+
+// ====== Execução / Risk Engine ======
+function openPosition(side, c){
+  const px = applyCosts(c.c, 'entry');
+  // sizing: risco % do equity com stopAtr * ATR%
+  const atrPctVal = c.atr/100;
+  const stopPct = atrPctVal * state.stopAtr; // ex.: 2*ATR%
+  if (stopPct<=0) return;
+
+  const riskDollar = state.equity * (state.riskPct/100);
+  let qty = (riskDollar / (px*stopPct))*state.leverage;
+  let notional = qty * px;
+  if (notional < state.minNotional){
+    log('warn',`Ordem bloqueada (NOTIONAL < ${state.minNotional}). Notional=${notional.toFixed(2)}`);
+    return;
+  }
+  qty = Math.max(0, qty);
+
+  let sl,tp;
+  if (side==='long'){
+    sl = px*(1 - stopPct);
+    const targetPct = stopPct*state.targetR;
+    tp = px*(1 + targetPct);
+  }else{
+    sl = px*(1 + stopPct);
+    const targetPct = stopPct*state.targetR;
+    tp = px*(1 - targetPct);
+  }
+  state.pos = {side, qty, entry:px, sl, tp, notional};
+  log('trade',`ABRE ${side.toUpperCase()} @ ${px.toFixed(2)} | qty=${qty.toFixed(6)} sl=${sl.toFixed(2)} tp=${tp.toFixed(2)}`);
+  markTrade(px,'open',side);
+  uiSync();
+}
+
+function closePosition(reason, price, note=''){
+  if (!state.pos) return;
+  const px = applyCosts(price,'exit');
+  const dir = state.pos.side==='long'? +1 : -1;
+  const pnl = (px - state.pos.entry)*dir*state.pos.qty;
+  state.balance += pnl;
+  state.equity = state.balance;
+  const rec = {
+    t:new Date(),
+    side:state.pos.side,
+    entry:state.pos.entry,
+    exit:px,
+    qty:state.pos.qty,
+    sl:state.pos.sl,
+    tp:state.pos.tp,
+    realized:pnl,
+    reason, note
+  };
+  state.trades.unshift(rec);
+  appendTradeRow(rec);
+  log('trade',`FECHA ${state.pos.side.toUpperCase()} @ ${px.toFixed(2)} | PnL=${fmtUSD(pnl)} (${reason}) ${note?' - '+note:''}`);
+  markTrade(px,'close',state.pos.side);
+  state.pos=null;
+  uiSync();
+}
+
+function applyCosts(price, phase){
+  // aplica slippage e fees agregados
+  const slip = price * (state.slipBps/10000);
+  const fee = price * (state.feeBps/10000);
+  if (phase==='entry'){
+    return price + slip + fee; // piora entrada
+  }else{
+    return price - slip - fee; // piora saída
+  }
+}
+
+function appendTradeRow(tr){
+  const tbody = el('tradesTable').querySelector('tbody');
+  const trEl = document.createElement('tr');
+  trEl.innerHTML = `
+    <td>${new Date(tr.t).toLocaleString()}</td>
+    <td>${tr.side}</td>
+    <td>${tr.exit.toFixed(2)}</td>
+    <td>${tr.qty.toFixed(6)}</td>
+    <td>${tr.sl.toFixed(2)}</td>
+    <td>${tr.tp.toFixed(2)}</td>
+    <td class="${tr.realized>=0?'ok':'bad'}">${fmtUSD(tr.realized)}</td>
+  `;
+  tbody.prepend(trEl);
+  while (tbody.rows.length>200) tbody.deleteRow(-1);
+}
+
+function exportCSV(){
+  const rows = [
+    ['time','side','entry','exit','qty','sl','tp','realized','reason','note']
+  ];
+  for (const t of state.trades.slice().reverse()){
+    rows.push([
+      new Date(t.t).toISOString(), t.side, t.entry, t.exit, t.qty, t.sl, t.tp, t.realized, t.reason, t.note
+    ]);
+  }
+  const csv = rows.map(r=>r.join(',')).join('\n');
+  const blob = new Blob([csv],{type:'text/csv'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = 'cqt_trades.csv'; a.click();
+  URL.revokeObjectURL(url);
+}
+
+// ====== Chart ======
+let chart, dsOHLC, dsBuy, dsSell;
+function chartReset(){
+  if (chart){ chart.destroy(); chart=null; }
+  const ctx = el('chart').getContext('2d');
+
+  // Candle via custom rendering usando linha/retângulo (MVP)
+  const labels = state.prices.map(p=>new Date(p.t).toLocaleTimeString());
+  dsOHLC = {
+    label:'Preço',
+    data: state.prices.map(p=>({x:new Date(p.t), y:p.c})),
+    borderWidth:1,
+    pointRadius:0,
+    tension:0.2
+  };
+  dsBuy = {label:'Entradas', data:[], pointRadius:5, showLine:false};
+  dsSell = {label:'Saídas', data:[], pointRadius:5, showLine:false};
+
+  chart = new Chart(ctx, {
+    type:'line',
+    data:{labels, datasets:[dsOHLC, dsBuy, dsSell]},
+    options:{
+      animation:false,
+      responsive:true,
+      scales:{
+        x:{type:'time', time:{unit:'minute'}},
+        y:{beginAtZero:false}
+      },
+      plugins:{
+        legend:{labels:{filter:(i)=>i.text!=='Preço'?true:false}},
+        tooltip:{mode:'index', intersect:false}
+      }
+    }
+  });
+}
+function chartUpdateAll(){
+  chartReset();
+  chart.update();
+}
+function chartPush(c){
+  if (!chart) chartReset();
+  dsOHLC.data.push({x:new Date(c.t), y:c.c});
+  if (dsOHLC.data.length>1200) dsOHLC.data.shift();
+  chart.update();
+}
+function markTrade(price,type,side){
+  const ds = (type==='open') ? dsBuy : dsSell;
+  ds.data.push({x:new Date(state.prices.at(-1).t), y:price, r:5});
+  chart.update();
+}
+
+// ====== Loop principal ======
+function mainLoop(){
+  // atualizar equity pela marcação a mercado se posição aberta
+  if (state.pos){
+    const c = state.prices.at(-1)?.c;
+    if (c){
+      const dir = state.pos.side==='long'? +1 : -1;
+      const pnlUnr = (c - state.pos.entry)*dir*state.pos.qty;
+      state.equity = state.balance + pnlUnr;
+    }
+  } else {
+    state.equity = state.balance;
+  }
+
+  // tick
+  nextCandle();
+  uiSync();
+}
+
+function run(){
+  if (tickTimer) clearInterval(tickTimer);
+  const speed = +el('speed').value;
+  const ms = 1000/Math.max(1,speed);
+  tickTimer = setInterval(mainLoop, ms);
+}
+
+function stop(){
+  if (tickTimer) clearInterval(tickTimer);
+  tickTimer=null;
+}
+
+// ====== Eventos UI ======
+function bind(){
+  el('mode').addEventListener('change', e=>{
+    state.mode = e.target.value;
+    el('modeLabel').textContent = state.mode==='sim'?'Simulação':(state.mode==='paper'?'Paper':'Real');
+    persist();
+  });
+  el('symbol').addEventListener('change', e=>{ state.symbol=e.target.value; persist(); });
+  el('tf').addEventListener('change', e=>{ state.tf=e.target.value; resetSimulation(); persist(); });
+  el('speed').addEventListener('change', e=>{ state.speed=+e.target.value; run(); persist(); });
+
+  el('riskPct').addEventListener('input', e=>{ state.riskPct=+e.target.value; persist(); });
+  el('stopAtr').addEventListener('input', e=>{ state.stopAtr=+e.target.value; persist(); });
+  el('targetR').addEventListener('input', e=>{ state.targetR=+e.target.value; persist(); });
+  el('feeBps').addEventListener('input', e=>{ state.feeBps=+e.target.value; persist(); });
+  el('slipBps').addEventListener('input', e=>{ state.slipBps=+e.target.value; persist(); });
+  el('maxDailyDD').addEventListener('input', e=>{ state.maxDailyDD=+e.target.value; persist(); });
+  el('paperBalance').addEventListener('input', e=>{ state.balance=+e.target.value; state.startOfDayBalance=state.balance; uiSync(); persist(); });
+  el('minNotional').addEventListener('input', e=>{ state.minNotional=+e.target.value; persist(); });
+  el('leverage').addEventListener('input', e=>{ state.leverage=+e.target.value; persist(); });
+
+  el('stDonchian').addEventListener('change', e=>{ state.don.enabled=e.target.checked; persist();});
+  el('donLen').addEventListener('input', e=>{ state.don.len=+e.target.value; persist();});
+  el('donAtrMin').addEventListener('input', e=>{ state.don.atrMin=+e.target.value; persist();});
+
+  el('stBBrsi').addEventListener('change', e=>{ state.bbrsi.enabled=e.target.checked; persist();});
+  el('bbLen').addEventListener('input', e=>{ state.bbrsi.bbLen=+e.target.value; persist();});
+  el('bbK').addEventListener('input', e=>{ state.bbrsi.bbK=+e.target.value; persist();});
+  el('rsiLen').addEventListener('input', e=>{ state.bbrsi.rsiLen=+e.target.value; persist();});
+  el('rsiZone').addEventListener('input', e=>{ state.bbrsi.rsiZone=+e.target.value; persist();});
+
+  el('allocator').addEventListener('change', e=>{ state.allocator=e.target.value; persist();});
+  el('corrPenalty').addEventListener('input', e=>{ state.corrPenalty=+e.target.value; persist();});
+
+  el('autoPilot').addEventListener('change', e=>{
+    state.running = e.target.checked;
+    if (state.running && state.kill){
+      state.kill=false;
+    }
+    log('info', `Autopilot ${state.running?'ON':'OFF'}`);
+    uiSync();
+  });
+  el('killSwitch').addEventListener('click', ()=>{
+    state.running=false; state.kill=true; el('autoPilot').checked=false;
+    if (state.pos) closePosition('kill', state.prices.at(-1).c, 'Kill-switch');
+    log('warn','KILL-SWITCH acionado: bot pausado e posição fechada');
+    uiSync();
+  });
+  el('resetSim').addEventListener('click', resetSimulation);
+  el('exportCsv').addEventListener('click', exportCSV);
+
+  // conexões (armazenamento local – apenas ilustrativo)
+  el('saveConn').addEventListener('click', ()=>{
+    const payload = {
+      exch:el('exch').value,
+      apiKey:el('apiKey').value,
+      apiSecret:el('apiSecret').value
+    };
+    localStorage.setItem('cqt_conn_'+payload.exch, JSON.stringify(payload));
+    log('info', `Conexão ${payload.exch} salva localmente (somente neste aparelho).`);
+  });
+}
+
+function init(){
+  bind();
+  restore();
+  resetSimulation();
+  run();
+}
+init();
+
+</script>
+</body>
+</html>
